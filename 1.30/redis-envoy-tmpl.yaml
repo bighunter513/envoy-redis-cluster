@@ -3,7 +3,15 @@ admin:
     socket_address:
       address: 0.0.0.0
       port_value: 9901
-      
+
+overload_manager:
+  refresh_interval: 0.25s
+  resource_monitors:
+    - name: "envoy.resource_monitors.global_downstream_max_connections"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+        max_active_downstream_connections: 9999
+
 static_resources:
   listeners:
     - name: redis_listener
@@ -19,9 +27,25 @@ static_resources:
                 stat_prefix: egress_redis
                 settings:
                   op_timeout: 5s
+                  read_policy: PREFER_MASTER
+                  enable_hashtagging: true
+                  connection_rate_limit:
+                    connection_rate_limit_per_sec: 100
+                  enable_redirection: true
+                  dns_cache_config:
+                    name: redis_cache
+                    dns_lookup_family: V4_ONLY
+                    dns_refresh_rate: 10s
+                    dns_query_timeout: 1s
+                    preresolve_hostnames:
+                      - protocol: TCP
+                        address: REDIS_HOST
+                        port_value: 6379
+
                 prefix_routes:
                   catch_all_route:
                     cluster: redis_cluster
+
   clusters:
     - name: redis_cluster
       cluster_type:
@@ -41,4 +65,3 @@ static_resources:
             endpoint:
               address:
                 socket_address: { address: REDIS_HOST, port_value: 6379 }
-
